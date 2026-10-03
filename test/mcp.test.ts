@@ -17,6 +17,7 @@ import { Storage_getDefault } from "../src/models/storage";
 import { MockFetch } from "./utils/mockFetch";
 import sinon from "sinon";
 import JWT from "jsonwebtoken";
+import { IHistoryRecord } from "../src/types";
 
 function buildMcpEvent(body: unknown, headers?: Record<string, string>): APIGatewayProxyEvent {
   return {
@@ -680,6 +681,39 @@ describe("MCP", () => {
       );
       expect(deleteResult.statusCode).to.equal(200);
       expect(parseBody(deleteResult).result.isError).to.be.undefined;
+    });
+
+    it("get_history_record finds a record older than the 200 newest", async () => {
+      const userDao = new UserDao(di);
+      const base: IHistoryRecord = {
+        vtype: "history_record",
+        id: 1000,
+        date: new Date(1000).toISOString(),
+        startTime: 1000,
+        programId: "emptyprogram",
+        programName: "Adhoc",
+        day: 1,
+        dayName: "Workout",
+        entries: [],
+      };
+      for (let i = 0; i <= 200; i += 1) {
+        await userDao.saveHistoryRecord(userId, { ...base, id: 1000 + i, startTime: 1000 + i });
+      }
+      const result = await handler(
+        buildMcpEvent(toolCall("get_history_record", { id: "1000" }), authHeaders(token)),
+        ctx
+      );
+      const body = parseBody(result);
+      expect(body.result.isError).to.be.undefined;
+      expect(JSON.parse(body.result.content[0].text).id).to.equal(1000);
+    });
+
+    it("get_history_record returns 404 for an unknown id", async () => {
+      const result = await handler(
+        buildMcpEvent(toolCall("get_history_record", { id: "12345" }), authHeaders(token)),
+        ctx
+      );
+      expect(parseBody(result).result.isError).to.equal(true);
     });
 
     it("returns error for invalid history text", async () => {

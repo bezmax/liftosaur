@@ -150,6 +150,21 @@ export async function ApiV1_getHistory(
   });
 }
 
+export async function ApiV1_getHistoryRecord(
+  userId: string,
+  user: ILimitedUserDao,
+  recordId: number,
+  di: IDI
+): Promise<IApiResult<{ id: number; text: string }>> {
+  const settings = user.storage.settings;
+  const userDao = new UserDao(di);
+  const [record] = await userDao.getHistoryByUserId(userId, { ids: [recordId] });
+  if (!record) {
+    return err(404, "not_found", "History record not found");
+  }
+  return ok({ id: record.id, text: LiftohistorySerializer_serialize(record, settings) });
+}
+
 export async function ApiV1_createHistory(
   userId: string,
   user: ILimitedUserDao,
