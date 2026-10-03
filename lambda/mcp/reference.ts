@@ -111,6 +111,9 @@ In target sets, a duration is the rest timer, and \`setTimer|restTimer\` is a ti
 - \`//\` at start of line = workout or exercise note
 - Workouts separated by blank lines
 - Closing \`}\` on its own line
+
+### Individual sets
+The text groups identical sets, like \`3x5 185lb\`. \`get_history_record\` also returns a \`sets\` array with one entry per completed set, warmups included. Entries are in the order the sets were done, by \`completedAt\` (unix ms). \`completedAt\` is null when the record has no time for the set. \`exercise\` matches the name at the start of the exercise line.
 `;
 
   return cachedLiftohistoryReference;

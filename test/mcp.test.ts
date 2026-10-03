@@ -18,6 +18,8 @@ import { MockFetch } from "./utils/mockFetch";
 import sinon from "sinon";
 import JWT from "jsonwebtoken";
 import { IHistoryRecord } from "../src/types";
+import { Weight_build } from "../src/models/weight";
+import { LiftohistorySerializer_serialize } from "../src/liftohistory/liftohistorySerializer";
 
 function buildMcpEvent(body: unknown, headers?: Record<string, string>): APIGatewayProxyEvent {
   return {
@@ -714,6 +716,144 @@ describe("MCP", () => {
         ctx
       );
       expect(parseBody(result).result.isError).to.equal(true);
+    });
+
+    describe("individual sets", () => {
+      const record: IHistoryRecord = {
+        vtype: "history_record",
+        id: 1772274600000,
+        date: "2026-02-28T10:30:00.000Z",
+        startTime: 1772274600000,
+        programId: "emptyprogram",
+        programName: "Adhoc",
+        day: 1,
+        dayName: "Workout",
+        entries: [
+          {
+            vtype: "history_entry",
+            id: "benchPress",
+            index: 0,
+            exercise: { id: "benchPress", equipment: "barbell" },
+            warmupSets: [],
+            sets: [
+              {
+                vtype: "set",
+                id: "b1",
+                index: 0,
+                completedReps: 8,
+                completedWeight: Weight_build(135, "lb"),
+                timestamp: 1772274700000,
+              },
+              {
+                vtype: "set",
+                id: "b2",
+                index: 1,
+                completedReps: 8,
+                completedWeight: Weight_build(135, "lb"),
+                timestamp: 1772274900000,
+              },
+            ],
+          },
+          {
+            vtype: "history_entry",
+            id: "bentOverRow",
+            index: 1,
+            exercise: { id: "bentOverRow", equipment: "barbell" },
+            warmupSets: [
+              {
+                vtype: "set",
+                id: "r0",
+                index: 0,
+                completedReps: 10,
+                completedWeight: Weight_build(65, "lb"),
+                timestamp: 1772274750000,
+              },
+            ],
+            sets: [
+              {
+                vtype: "set",
+                id: "r1",
+                index: 0,
+                completedReps: 10,
+                completedWeight: Weight_build(115, "lb"),
+                timestamp: 1772274800000,
+              },
+              { vtype: "set", id: "r2", index: 1, completedReps: 10, completedWeight: Weight_build(115, "lb") },
+            ],
+          },
+        ],
+      };
+
+      beforeEach(async () => {
+        await new UserDao(di).saveHistoryRecord(userId, record);
+      });
+
+      async function callTool(name: string, args: Record<string, unknown>): Promise<any> {
+        const result = await handler(buildMcpEvent(toolCall(name, args), authHeaders(token)), ctx);
+        const body = parseBody(result);
+        expect(body.result.isError).to.be.undefined;
+        return JSON.parse(body.result.content[0].text);
+      }
+
+      const expectedText = (): string => LiftohistorySerializer_serialize(record, Storage_getDefault().settings);
+
+      it("get_history returns only id and text", async () => {
+        const data = await callTool("get_history", {});
+        expect(data.records).to.deep.equal([{ id: record.id, text: expectedText() }]);
+      });
+
+      it("get_history_record returns the text and the sets in the order they were done", async () => {
+        const data = await callTool("get_history_record", { id: String(record.id) });
+        expect(Object.keys(data)).to.deep.equal(["id", "text", "sets"]);
+        expect(data.text).to.equal(expectedText());
+        expect(data.sets).to.deep.equal([
+          {
+            exercise: "Bench Press",
+            entryIndex: 0,
+            kind: "work",
+            setNumber: 1,
+            reps: 8,
+            weight: "135lb",
+            completedAt: 1772274700000,
+          },
+          {
+            exercise: "Bent Over Row",
+            entryIndex: 1,
+            kind: "warmup",
+            setNumber: 1,
+            reps: 10,
+            weight: "65lb",
+            completedAt: 1772274750000,
+          },
+          {
+            exercise: "Bent Over Row",
+            entryIndex: 1,
+            kind: "work",
+            setNumber: 1,
+            reps: 10,
+            weight: "115lb",
+            completedAt: 1772274800000,
+          },
+          {
+            exercise: "Bench Press",
+            entryIndex: 0,
+            kind: "work",
+            setNumber: 2,
+            reps: 8,
+            weight: "135lb",
+            completedAt: 1772274900000,
+          },
+          {
+            exercise: "Bent Over Row",
+            entryIndex: 1,
+            kind: "work",
+            setNumber: 2,
+            reps: 10,
+            weight: "115lb",
+            completedAt: null,
+          },
+        ]);
+      });
     });
 
     it("returns error for invalid history text", async () => {

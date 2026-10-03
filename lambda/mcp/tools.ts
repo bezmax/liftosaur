@@ -175,7 +175,8 @@ const mcpToolsWithoutOutputSchema: Omit<IMcpToolDef, "outputSchema">[] = [
   },
   {
     name: "get_history_record",
-    description: "Get a single workout history record by ID. Returns the record in Liftohistory text format.",
+    description:
+      'Get a single workout history record by ID. Returns the record in Liftohistory text format, plus a `sets` array with one entry per completed set, warmups included, in the order they were done: `{ exercise, entryIndex, kind: "warmup" | "work", setNumber, reps, weight?, completedAt }`. completedAt is unix ms, or null when the set has no time (those come last).',
     annotations: { title: "Get workout record", readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     inputSchema: {
       type: "object",
